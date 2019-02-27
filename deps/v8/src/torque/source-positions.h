@@ -5,6 +5,8 @@
 #ifndef V8_TORQUE_SOURCE_POSITIONS_H_
 #define V8_TORQUE_SOURCE_POSITIONS_H_
 
+#include <iostream>
+
 #include "src/torque/contextual.h"
 
 namespace v8 {
@@ -12,20 +14,41 @@ namespace internal {
 namespace torque {
 
 class SourceId {
+ public:
+  static SourceId Invalid() { return SourceId(-1); }
+  int operator==(const SourceId& s) const { return id_ == s.id_; }
+
  private:
   explicit SourceId(int id) : id_(id) {}
   int id_;
   friend class SourceFileMap;
 };
 
-struct SourcePosition {
-  SourceId source;
+struct LineAndColumn {
   int line;
   int column;
+
+  static LineAndColumn Invalid() { return {-1, -1}; }
 };
 
-DECLARE_CONTEXTUAL_VARIABLE(CurrentSourceFile, SourceId)
-DECLARE_CONTEXTUAL_VARIABLE(CurrentSourcePosition, SourcePosition)
+struct SourcePosition {
+  SourceId source;
+  LineAndColumn start;
+  LineAndColumn end;
+
+  static SourcePosition Invalid() {
+    SourcePosition pos{SourceId::Invalid(), LineAndColumn::Invalid(),
+                       LineAndColumn::Invalid()};
+    return pos;
+  }
+
+  bool CompareStartIgnoreColumn(const SourcePosition& pos) const {
+    return start.line == pos.start.line && source == pos.source;
+  }
+};
+
+DECLARE_CONTEXTUAL_VARIABLE(CurrentSourceFile, SourceId);
+DECLARE_CONTEXTUAL_VARIABLE(CurrentSourcePosition, SourcePosition);
 
 class SourceFileMap : public ContextualClass<SourceFileMap> {
  public:
@@ -45,7 +68,12 @@ class SourceFileMap : public ContextualClass<SourceFileMap> {
 
 inline std::string PositionAsString(SourcePosition pos) {
   return SourceFileMap::GetSource(pos.source) + ":" +
-         std::to_string(pos.line + 1) + ":" + std::to_string(pos.column + 1);
+         std::to_string(pos.start.line + 1) + ":" +
+         std::to_string(pos.start.column + 1);
+}
+
+inline std::ostream& operator<<(std::ostream& out, SourcePosition pos) {
+  return out << PositionAsString(pos);
 }
 
 }  // namespace torque
